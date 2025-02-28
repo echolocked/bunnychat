@@ -1,0 +1,7 @@
+[Cursor] Initial commit
+
+- Created DeepSeek chatbot with CLI interface
+- Added web search integration
+- Implemented streaming responses
+- Added chat history persistence
+- Set up project structure and documentation 
