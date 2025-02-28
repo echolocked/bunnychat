@@ -1,6 +1,6 @@
 # BunnyChat
 
-A command-line chatbot using DeepSeek's API, with support for web search and streaming responses.
+A chatbot using DeepSeek's API, with support for web search and streaming responses. Features both command-line and web interfaces.
 
 ## Features
 
@@ -9,6 +9,11 @@ A command-line chatbot using DeepSeek's API, with support for web search and str
 - Web search integration
 - Chat history persistence
 - Command history support
+- Web interface with:
+  * LaTeX math rendering
+  * Markdown formatting
+  * Code syntax highlighting
+  * Modern, responsive design
 
 ## Installation
 
@@ -36,7 +41,9 @@ DEEPSEEK_API_KEY=your_api_key_here
 
 ## Usage
 
-Run the chatbot:
+### Command-line Interface
+
+Run the chatbot in terminal:
 ```bash
 bunnychat
 ```
@@ -45,6 +52,19 @@ Available commands:
 - `/search <query>` - Search the internet
 - `/clear` - Clear chat history
 - `/quit` or `/exit` - End chat
+
+### Web Interface
+
+Run the web interface:
+```bash
+bunnychat-web
+```
+
+Then open http://localhost:5000 in your browser. The web interface provides:
+- Beautiful formatting for mathematical expressions using LaTeX
+- Markdown rendering for rich text formatting
+- Syntax highlighting for code blocks
+- Modern, responsive design
 
 ## Development
 
@@ -57,11 +77,14 @@ bunnychat/
 │   │   └── cli.py       # Command-line interface
 │   ├── config/
 │   │   └── settings.py  # Configuration settings
-│   └── utils/
-│       ├── helpers.py   # Helper functions
-│       └── search.py    # Web search utilities
-├── tools/               # External tools
-└── requirements.txt     # Project dependencies
+│   ├── utils/
+│   │   ├── helpers.py   # Helper functions
+│   │   └── search.py    # Web search utilities
+│   └── web/            # Web interface
+│       ├── app.py      # Flask application
+│       └── templates/  # HTML templates
+├── tools/              # External tools
+└── requirements.txt    # Project dependencies
 ```
 
 ## License
