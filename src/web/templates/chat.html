@@ -36,67 +36,194 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
+            line-height: 1.4;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
+            background-color: white;
         }
         
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 20px;
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 260px 1fr;
+        }
+        
+        .sidebar {
+            border-right: 1px solid #eee;
+            background: #f8f9fa;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+        
+        .new-chat-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #eef3ff;
+            color: #1a73e8;
+            border: 1px solid #d2e3fc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        .new-chat-btn:hover {
+            background: #d2e3fc;
+        }
+        
+        .new-chat-btn i {
+            font-size: 20px;
+        }
+        
+        .tabs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0;
+            border: none;
+            overflow-y: auto;
+        }
+        
+        .tab {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .tab.active {
+            background: #eef3ff;
+            color: #1a73e8;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #f1f3f4;
+        }
+        
+        .tab .tab-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .tab .tab-actions {
+            display: none;
+            gap: 4px;
+        }
+        
+        .tab:hover .tab-actions {
+            display: flex;
+        }
+        
+        .tab .edit-btn,
+        .tab .close-btn {
+            padding: 2px;
+            border-radius: 4px;
+            opacity: 0.7;
+            font-size: 14px;
+        }
+        
+        .tab .edit-btn:hover,
+        .tab .close-btn:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
         
         .chat-container {
-            height: 500px;
+            flex-grow: 1;
+            padding: 20px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
         }
         
         .message {
-            margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 5px;
+            margin-bottom: 20px;
+            line-height: 1.5;
         }
         
-        .user-message {
-            background-color: #e3f2fd;
-            margin-left: 20%;
+        .message strong {
+            color: #666;
+            font-weight: 500;
+            margin-right: 8px;
         }
         
-        .assistant-message {
-            background-color: #f5f5f5;
-            margin-right: 20%;
+        .user-message, .assistant-message {
+            color: #1a1a1a;
+        }
+        
+        .message-row {
+            white-space: nowrap;
+        }
+        
+        .message-content {
+            display: inline;
+            white-space: normal;
+        }
+        
+        /* Add thinking process styles */
+        .thinking-process {
+            color: #666;
+            margin: 4px 0 8px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
         }
         
         .input-container {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 15px 0;
+            border-top: 1px solid #eee;
             display: flex;
             gap: 10px;
         }
         
         #user-input {
             flex-grow: 1;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        
+        #user-input:focus {
+            outline: none;
+            border-color: #2196f3;
         }
         
         button {
-            padding: 10px 20px;
+            padding: 8px 16px;
             background-color: #2196f3;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
+            transition: background-color 0.2s;
         }
         
         button:hover {
@@ -104,10 +231,55 @@
         }
         
         .commands {
-            margin-bottom: 20px;
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
             padding: 10px;
-            background-color: #fff3e0;
-            border-radius: 5px;
+            font-size: 0.9em;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .commands ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .commands li {
+            margin: 2px 0;
+        }
+        
+        .help-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #f5f5f5;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            z-index: 1001;
+        }
+        
+        .help-button:hover {
+            background-color: #e0e0e0;
+        }
+        
+        h1 {
+            padding: 15px 0;
+            margin: 0;
+            font-size: 1.5em;
+            color: #333;
+            border-bottom: 1px solid #eee;
         }
         
         code {
@@ -115,42 +287,122 @@
             padding: 2px 4px;
             border-radius: 3px;
             font-family: Monaco, Consolas, "Courier New", monospace;
+            font-size: 0.9em;
         }
         
         pre code {
             display: block;
-            padding: 10px;
+            padding: 12px;
             overflow-x: auto;
+            background-color: #f8f9fa;
+            border-radius: 6px;
         }
         
-        .math {
-            overflow-x: auto;
-            padding: 5px 0;
+        /* File upload styles */
+        .file-upload {
+            margin: 10px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: none;
         }
-
-        .message p {
-            margin: 0.5em 0;
+        
+        .file-upload.drag-over {
+            border-color: #2196f3;
+            background-color: #f5f5f5;
+        }
+        
+        .file-upload-input {
+            display: none;
+        }
+        
+        .upload-button {
+            background-color: #4caf50;
+        }
+        
+        .upload-button:hover {
+            background-color: #388e3c;
+        }
+        
+        .upload-button.active {
+            background-color: #388e3c;
+        }
+        
+        /* Add thinking animation styles */
+        @keyframes blink {
+            0% { opacity: .2; }
+            20% { opacity: 1; }
+            100% { opacity: .2; }
+        }
+        
+        .thinking span {
+            animation-name: blink;
+            animation-duration: 1.4s;
+            animation-iteration-count: infinite;
+            animation-fill-mode: both;
+        }
+        
+        .thinking span:nth-child(2) { animation-delay: .2s; }
+        .thinking span:nth-child(3) { animation-delay: .4s; }
+        
+        .thinking {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>BunnyChat</h1>
-        
-        <div class="commands">
-            <strong>Available commands:</strong>
-            <ul>
-                <li><code>/search &lt;query&gt;</code> - Search the internet</li>
-                <li><code>/clear</code> - Clear chat history</li>
-            </ul>
+        <!-- Left sidebar -->
+        <div class="sidebar">
+            <button class="new-chat-btn" onclick="createNewChat()">
+                <i>+</i>
+                New chat
+            </button>
+            <div class="tabs-container"></div>
         </div>
         
-        <div id="chat-container" class="chat-container"></div>
-        
-        <div class="input-container">
-            <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off">
-            <button onclick="sendMessage()">Send</button>
-            <button onclick="clearHistory()">Clear</button>
+        <!-- Main content -->
+        <div class="main-content">
+            <button class="help-button" onclick="toggleCommands()">?</button>
+            
+            <div class="commands">
+                <strong>Available commands:</strong>
+                <ul>
+                    <li><code>/search &lt;query&gt;</code> - Search the internet</li>
+                    <li><code>/clear</code> - Clear chat history</li>
+                </ul>
+            </div>
+            
+            <div id="chat-container" class="chat-container"></div>
+            
+            <!-- Thinking process template -->
+            <template id="thinking-template">
+                <div class="message assistant-message">
+                    <strong>Assistant:</strong>
+                    <div class="thinking">
+                        Generating response<span>.</span><span>.</span><span>.</span>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- File upload area -->
+            <div id="file-upload" class="file-upload">
+                <input type="file" id="file-upload-input" class="file-upload-input" multiple>
+                <p>Drag and drop files here or click to select files</p>
+                <p><small>Supported files: .txt, .pdf, .png, .jpg, .jpeg, .gif, .py, .js, .html, .css, .json, .md</small></p>
+            </div>
+            
+            <div class="input-container">
+                <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off">
+                <button onclick="sendMessage()">Send</button>
+                <button onclick="clearHistory()">Clear</button>
+                <button onclick="toggleFileUpload()" class="upload-button">Upload</button>
+            </div>
         </div>
     </div>
     
@@ -195,44 +447,156 @@
         }
         
         // Handle message sending
+        let chats = [{
+            id: 'chat-1',
+            name: 'Chat 1',
+            messages: [],  // Store actual message elements
+            history: []    // Store message data
+        }];
+        let currentChatId = 'chat-1';
+        let currentController = null;
+        let activeChats = {};  // Store active chat states
+        
         async function sendMessage() {
             const input = document.getElementById('user-input');
             const message = input.value.trim();
             if (!message) return;
             
-            // Clear input
             input.value = '';
+            input.disabled = true;
             
-            // Add user message
-            appendMessage('user', message);
+            // Get current chat
+            const currentChat = chats.find(chat => chat.id === currentChatId);
+            if (!currentChat) {
+                console.error('Current chat not found');
+                return;
+            }
             
             try {
-                // Send to server
+                // Create new AbortController for this request
+                if (currentController) {
+                    currentController.abort();
+                }
+                currentController = new AbortController();
+                
+                // Add user message immediately
+                appendMessage('user', message);
+                
+                // Add to chat history
+                currentChat.history.push({
+                    role: 'user',
+                    content: message
+                });
+                
+                // Create message container for assistant's response
+                messageDiv = document.createElement('div');
+                messageDiv.className = 'message assistant-message';
+                
+                // Create thinking div first (it will be populated later)
+                const thinkingDiv = document.createElement('div');
+                thinkingDiv.className = 'thinking-process';
+                messageDiv.appendChild(thinkingDiv);
+                
+                const messageRow = document.createElement('div');
+                messageRow.className = 'message-row';
+                
+                const roleLabel = document.createElement('strong');
+                roleLabel.textContent = 'Assistant:';
+                messageRow.appendChild(roleLabel);
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentSpan = document.createElement('span');
+                contentDiv.appendChild(contentSpan);
+                messageRow.appendChild(contentDiv);
+                
+                messageDiv.appendChild(messageRow);
+                
+                // Save initial state
+                activeChats[currentChatId] = {
+                    messageDiv: messageDiv,
+                    contentSpan: contentSpan,
+                    responseText: ''
+                };
+
+                document.getElementById('chat-container').appendChild(messageDiv);
+
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({
+                        message: message,
+                        chatId: currentChatId
+                    }),
+                    signal: currentController.signal
                 });
                 
-                const data = await response.json();
-                if (data.error) {
-                    throw new Error(data.error);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) {
+                        console.debug('Stream completed');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, {stream: true});
+                    
+                    const lines = chunk.split('\n').filter(line => line.trim());
+                    for (const line of lines) {
+                        const data = JSON.parse(line);
+                        
+                        // Check if this response is for the current chat
+                        if (data.chatId !== currentChatId) {
+                            console.debug(`Skipping response for chat ${data.chatId}`);
+                            continue;
+                        }
+                        
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        
+                        // Handle thinking process
+                        if (data.type === 'thinking') {
+                            // Update existing thinking div
+                            const thinkingDiv = messageDiv.querySelector('.thinking-process');
+                            if (thinkingDiv) {
+                                thinkingDiv.textContent = data.full_thinking;
+                            }
+                            continue;
+                        }
+                        
+                        // Handle thinking end
+                        if (data.type === 'thinking_end') {
+                            const thinkingDiv = messageDiv.querySelector('.thinking-process');
+                            if (thinkingDiv) {
+                                thinkingDiv.style.borderBottom = '1px solid #eee';
+                                thinkingDiv.style.marginBottom = '12px';
+                            }
+                            continue;
+                        }
+                        
+                        // Handle response chunks
+                        if (data.chunk && contentSpan) {
+                            contentSpan.textContent = data.response; // Use full response instead of just chunk
+                            activeChats[currentChatId].responseText = data.response;
+                            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+                        }
+                    }
                 }
-                
-                // Add assistant response
-                appendMessage('assistant', data.response);
-                
-                // Scroll to bottom
-                const chatContainer = document.getElementById('chat-container');
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-                
-                // Render math expressions
-                MathJax.typesetPromise();
             } catch (error) {
-                console.error('Error:', error);
-                appendMessage('assistant', `Error: ${error.message}`);
+                if (error.name === 'AbortError') {
+                    console.debug('Request aborted');
+                } else {
+                    console.error('Error:', error);
+                    appendMessage('assistant', 'Error: ' + error.message);
+                }
+            } finally {
+                input.disabled = false;
+                currentController = null;
             }
         }
         
@@ -242,12 +606,19 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}-message`;
             
-            // Process content with protected LaTeX
-            const htmlContent = protectLatex(content);
+            const messageRow = document.createElement('div');
+            messageRow.className = 'message-row';
             
-            messageDiv.innerHTML = `<strong>${role === 'user' ? 'You' : 'Assistant'}:</strong><br>${htmlContent}`;
+            const roleLabel = document.createElement('strong');
+            roleLabel.textContent = `${role === 'user' ? 'You' : 'Assistant'}:`;
+            messageRow.appendChild(roleLabel);
             
+            const contentText = document.createTextNode(' ' + content);
+            messageRow.appendChild(contentText);
+            
+            messageDiv.appendChild(messageRow);
             chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
             
             // Force MathJax to reprocess the new content
             MathJax.typesetPromise([messageDiv]).catch((err) => console.error('MathJax error:', err));
@@ -256,7 +627,13 @@
         // Clear chat history
         async function clearHistory() {
             try {
-                await fetch('/api/clear', { method: 'POST' });
+                await fetch('/api/clear', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ chatId: currentChatId })
+                });
                 document.getElementById('chat-container').innerHTML = '';
             } catch (error) {
                 console.error('Error clearing history:', error);
@@ -269,6 +646,233 @@
                 sendMessage();
             }
         });
+        
+        // File upload handling
+        const fileUploadArea = document.getElementById('file-upload');
+        const fileInput = document.getElementById('file-upload-input');
+        let isFileUploadVisible = false;
+        
+        function toggleFileUpload() {
+            isFileUploadVisible = !isFileUploadVisible;
+            fileUploadArea.style.display = isFileUploadVisible ? 'block' : 'none';
+            document.querySelector('.upload-button').classList.toggle('active');
+        }
+        
+        // Handle file selection
+        fileInput.addEventListener('change', handleFiles);
+        
+        // Handle drag and drop
+        fileUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUploadArea.classList.add('drag-over');
+        });
+        
+        fileUploadArea.addEventListener('dragleave', () => {
+            fileUploadArea.classList.remove('drag-over');
+        });
+        
+        fileUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUploadArea.classList.remove('drag-over');
+            handleFiles({ target: { files: e.dataTransfer.files } });
+        });
+        
+        fileUploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        async function handleFiles(event) {
+            const files = event.target.files;
+            
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('chatId', currentChatId);  // Add current chat ID
+                
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    // Clear the file input
+                    fileInput.value = '';
+                    
+                    // Hide the upload area
+                    toggleFileUpload();
+                    
+                    // Update chat with new messages
+                    if (data.history && data.history.length >= 2) {
+                        const lastTwo = data.history.slice(-2);
+                        appendMessage('user', lastTwo[0].content);
+                        appendMessage('assistant', lastTwo[1].content);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    appendMessage('assistant', `Error uploading file: ${error.message}`);
+                }
+            }
+        }
+        
+        // Add toggle commands function
+        function toggleCommands() {
+            const commands = document.querySelector('.commands');
+            commands.style.display = commands.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        async function switchChat(chatId) {
+            console.debug(`Switching to chat ${chatId}`);
+            
+            // Save current chat's state if there's an active response
+            if (contentSpan) {
+                activeChats[currentChatId] = {
+                    messageDiv: messageDiv,
+                    contentSpan: contentSpan,
+                    responseText: contentSpan.textContent
+                };
+            }
+            
+            // Abort current stream if exists
+            if (currentController) {
+                console.debug('Aborting current stream');
+                currentController.abort();
+                currentController = null;
+            }
+            
+            // Update current chat ID
+            currentChatId = chatId;
+            
+            // Clear current message elements
+            messageDiv = null;
+            contentSpan = null;
+            
+            // Update UI
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            const newTab = document.getElementById(chatId);
+            if (newTab) {
+                newTab.classList.add('active');
+            } else {
+                console.error(`Could not find tab element for chat ${chatId}`);
+            }
+            
+            // Clear chat container
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.innerHTML = '';
+            
+            // Get the chat object
+            const chat = chats.find(c => c.id === chatId);
+            if (!chat) {
+                console.error(`Chat ${chatId} not found`);
+                return;
+            }
+            
+            // Restore chat history
+            chat.history.forEach(msg => {
+                appendMessage(msg.role, msg.content);
+            });
+            
+            // Restore active response if exists
+            if (activeChats[chatId]) {
+                messageDiv = activeChats[chatId].messageDiv;
+                contentSpan = activeChats[chatId].contentSpan;
+                if (contentSpan) {
+                    contentSpan.textContent = activeChats[chatId].responseText;
+                    chatContainer.appendChild(messageDiv);
+                }
+            }
+        }
+        
+        // Add chat management
+        function createNewChat() {
+            const chatId = `chat-${chats.length + 1}`;
+            const chatName = `Chat ${chats.length + 1}`;
+            
+            chats.push({
+                id: chatId,
+                name: chatName,
+                messages: [],
+                history: []
+            });
+            
+            addTabToUI(chatId, chatName);
+            switchChat(chatId);
+        }
+        
+        function addTabToUI(chatId, chatName) {
+            const tabsContainer = document.querySelector('.tabs-container');
+            const newTab = document.createElement('div');
+            newTab.className = 'tab';
+            newTab.id = chatId;
+            newTab.setAttribute('data-chat-id', chatId);
+            newTab.innerHTML = `
+                <div class="tab-name">${chatName}</div>
+                <div class="tab-actions">
+                    <span class="edit-btn" onclick="renameChat('${chatId}', event)">✎</span>
+                    <span class="close-btn" onclick="closeChat('${chatId}', event)">×</span>
+                </div>
+            `;
+            newTab.addEventListener('click', () => switchChat(chatId));
+            
+            // Add to the beginning of the list
+            tabsContainer.insertBefore(newTab, tabsContainer.firstChild);
+            
+            // Set this tab as active
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            newTab.classList.add('active');
+        }
+        
+        function closeChat(chatId, event) {
+            event.stopPropagation();
+            
+            // Don't close if it's the last chat
+            if (chats.length === 1) return;
+            
+            // Remove from chats array
+            chats = chats.filter(chat => chat.id !== chatId);
+            
+            // Remove tab from UI
+            const tab = document.querySelector(`.tab[data-chat-id="${chatId}"]`);
+            tab.remove();
+            
+            // Switch to another chat if closing current
+            if (currentChatId === chatId) {
+                switchChat(chats[0].id);
+            }
+        }
+        
+        function renameChat(chatId, event) {
+            event.stopPropagation();
+            
+            const tab = document.querySelector(`.tab[data-chat-id="${chatId}"]`);
+            const nameElement = tab.querySelector('.tab-name');
+            const currentName = nameElement.textContent;
+            
+            const newName = prompt('Enter new name for the chat:', currentName);
+            if (newName && newName.trim()) {
+                nameElement.textContent = newName.trim();
+                
+                // Update chat object
+                const chat = chats.find(c => c.id === chatId);
+                if (chat) {
+                    chat.name = newName.trim();
+                }
+            }
+        }
+        
+        // Initialize first tab
+        addTabToUI('chat-1', 'Chat 1');
+        switchChat('chat-1');
     </script>
 </body>
 </html> 
