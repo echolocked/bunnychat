@@ -38,7 +38,15 @@ class SearchSettings:
     max_concurrent: int = 3
     search_timeout: int = 10
 
+@dataclass
+class WebSettings:
+    """Web server settings."""
+    port: int = 5000
+    debug: bool = False
+    host: str = "localhost"
+
 # Default settings instances
 chat_settings = ChatSettings()
 api_settings = APISettings()
 search_settings = SearchSettings()
+web_settings = WebSettings()
