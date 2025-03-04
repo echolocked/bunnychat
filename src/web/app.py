@@ -322,6 +322,8 @@ def main():
                       help=f'Host to run the server on (default: {web_settings.host})')
     parser.add_argument('--debug', action='store_true', default=web_settings.debug,
                       help='Enable debug mode')
+    parser.add_argument('--model', type=str, default=chat_settings.model,
+                      help=f'Model to use (default: {chat_settings.model}). Options: deepseek-reasoner, deepseek-chat, deepseek-coder')
     
     args = parser.parse_args()
     
@@ -329,11 +331,13 @@ def main():
     web_settings.port = args.port
     web_settings.host = args.host
     web_settings.debug = args.debug
+    chat_settings.model = args.model  # Update model setting
     
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
     
     print(f"\nBunnyChat web interface running at http://{web_settings.host}:{web_settings.port}")
+    print(f"Using model: {chat_settings.model}")
     print("Press Ctrl+C to quit")
     
     try:

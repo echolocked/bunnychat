@@ -154,13 +154,13 @@
         
         .chat-container {
             flex-grow: 1;
-            padding: 20px;
+            padding: 15px 20px;  /* Reduced vertical padding */
             overflow-y: auto;
             margin-bottom: 0;
         }
         
         .message {
-            margin-bottom: 20px;
+            margin-bottom: 12px;  /* Reduced from 20px */
             line-height: 1.5;
         }
         
@@ -180,15 +180,100 @@
         
         .message-content {
             display: inline;
-            white-space: normal;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .message-content p {
+            margin: 0 0 0.8em 0;  /* Reduced bottom margin */
+            line-height: 1.5;      /* Slightly tighter line spacing */
+        }
+        
+        .message-content h1,
+        .message-content h2,
+        .message-content h3 {
+            margin: 1.2em 0 0.4em 0; /* Reduced bottom margin after headings */
+            color: #333;
+        }
+        
+        .message-content h1 {
+            font-size: 1.5em;
+        }
+        
+        .message-content h2 {
+            font-size: 1.3em;
+        }
+        
+        .message-content h3 {
+            font-size: 1.1em;
+        }
+        
+        /* Add space after headings */
+        .message-content h1 + p,
+        .message-content h2 + p,
+        .message-content h3 + p {
+            margin-top: 0.6em !important; /* Added space after subtitles */
+        }
+        
+        /* Adjust list spacing */
+        .message-content ul,
+        .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.2em;
+        }
+        
+        .message-content li {
+            margin: 0.2em 0;
+        }
+        
+        .message-content strong {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .message-content code {
+            background-color: #f1f3f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        /* Add blockquote styling */
+        .message-content blockquote {
+            margin: 0.8em 0;
+            padding: 0.5em 1em;
+            border-left: 3px solid #eee;
+            color: #666;
+            background-color: #f8f9fa;
+        }
+        
+        /* Tighten code block spacing */
+        pre code {
+            display: block;
+            padding: 12px;
+            overflow-x: auto;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            line-height: 1.3;
+            margin: 0.5em 0;
         }
         
         /* Add thinking process styles */
         .thinking-process {
             color: #666;
             margin: 4px 0 8px 0;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .thinking-process strong {
+            color: #333;
+            font-weight: 600;
         }
         
         .input-container {
@@ -290,14 +375,6 @@
             font-size: 0.9em;
         }
         
-        pre code {
-            display: block;
-            padding: 12px;
-            overflow-x: auto;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-        }
-        
         /* File upload styles */
         .file-upload {
             margin: 10px 0;
@@ -383,10 +460,7 @@
             <!-- Thinking process template -->
             <template id="thinking-template">
                 <div class="message assistant-message">
-                    <strong>Bunny:</strong>
-                    <div class="thinking">
-                        Generating response<span>.</span><span>.</span><span>.</span>
-                    </div>
+                    <div class="thinking-process"></div>
                 </div>
             </template>
             
@@ -497,8 +571,10 @@
                 thinkingDiv.className = 'thinking-process';
                 messageDiv.appendChild(thinkingDiv);
                 
+                // Create message row for the actual response (will be populated later)
                 const messageRow = document.createElement('div');
                 messageRow.className = 'message-row';
+                messageRow.style.display = 'none';  // Hide initially
                 
                 const roleLabel = document.createElement('strong');
                 roleLabel.textContent = 'Bunny:';
@@ -568,7 +644,13 @@
                                 // Update existing thinking div
                                 const thinkingDiv = messageDiv.querySelector('.thinking-process');
                                 if (thinkingDiv) {
-                                    thinkingDiv.textContent = data.full_thinking;
+                                    // Convert escaped newlines to <br> tags and preserve whitespace
+                                    const formattedThinking = data.full_thinking
+                                        .replace(/\\n/g, '<br>')
+                                        .replace(/\n/g, '<br>')
+                                        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                                    thinkingDiv.innerHTML = formattedThinking;
+                                    thinkingDiv.style.whiteSpace = 'pre-wrap';
                                 }
                                 continue;
                             }
@@ -579,12 +661,18 @@
                                 if (thinkingDiv) {
                                     thinkingDiv.style.borderBottom = '1px solid #eee';
                                     thinkingDiv.style.marginBottom = '12px';
+                                    thinkingDiv.style.paddingBottom = '8px';
                                 }
                                 continue;
                             }
                             
                             // Handle response chunks
                             if (data.chunk && contentSpan) {
+                                // Show the message row with "Bunny:" label if it's the first response chunk
+                                if (messageRow.style.display === 'none') {
+                                    messageRow.style.display = 'block';
+                                }
+                                
                                 // Accumulate response text
                                 let displayText = data.chunk;  // Use the chunk instead of complete response
                                 activeChats[currentChatId].responseText += displayText;
@@ -595,11 +683,11 @@
                                     .replace(/\\\\/g, '\\')  // Convert escaped backslashes
                                     .replace(/\\"/g, '"');   // Convert escaped quotes
                                 
-                                // Convert markdown-style formatting
-                                formattedText = formattedText
-                                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')  // Bold text
-                                    .replace(/\n---\n/g, '<hr>')  // Horizontal rules
-                                    .replace(/\n\n/g, '<br><br>');  // Paragraph breaks
+                                // Use marked.js to convert markdown to HTML
+                                formattedText = marked.parse(formattedText, {
+                                    breaks: true,
+                                    gfm: true
+                                });
                                 
                                 // Update display
                                 contentSpan.innerHTML = formattedText;
