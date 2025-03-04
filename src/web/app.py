@@ -77,6 +77,9 @@ chat_histories = {}
 chat_clients = {}  # Store separate client instances for each chat
 chat_locks = {}
 
+# Add a new variable to store pending file content
+pending_file_uploads = {}
+
 def load_chat_histories():
     """Load chat histories from disk."""
     global chat_histories
@@ -197,9 +200,22 @@ def chat():
         # Get chat history
         chat_history = chat_histories[chat_id]
         
+        # Check if there are pending file uploads
+        file_context = ""
+        if chat_id in pending_file_uploads and pending_file_uploads[chat_id]:
+            for file_info in pending_file_uploads[chat_id]:
+                file_context += f"\nContent of file {file_info['filename']}:\n\n{file_info['content']}\n"
+            # Clear pending uploads after including them
+            pending_file_uploads[chat_id] = []
+        
+        # Combine file content with user message if there's file context
+        full_message = message
+        if file_context:
+            full_message = f"{message}\n\nFor reference, here are the recently uploaded files:{file_context}"
+        
         # Create messages with history and system message
         messages = create_chat_messages(
-            user_message=message,
+            user_message=full_message,
             system_message=chat_settings.system_message,
             chat_history=chat_history
         )
@@ -317,58 +333,50 @@ def upload_file():
         return jsonify({'error': 'No selected file'}), 400
     
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Initialize chat history for this chat if it doesn't exist
-        if chat_id not in chat_histories:
-            chat_histories[chat_id] = []
-        
-        chat_history = chat_histories[chat_id]
-        
-        # Read file content
         try:
+            # Store original filename for display
+            original_filename = file.filename
+            # Secure the filename for storage
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Read file content and store it for later use
             with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
+                file_content = f.read()
             
-            # Only show upload notification in chat, but send full content to server
-            display_message = f"I've uploaded a file named {filename}."
-            server_content = f"I've uploaded a file named {filename}.\n\nFile content:\n\n{content}"
+            # Store file content in pending uploads
+            if chat_id not in pending_file_uploads:
+                pending_file_uploads[chat_id] = []
+            pending_file_uploads[chat_id].append({
+                'filename': original_filename,
+                'content': file_content
+            })
             
+            # Initialize chat history for this chat if it doesn't exist
+            if chat_id not in chat_histories:
+                chat_histories[chat_id] = []
+            
+            chat_history = chat_histories[chat_id]
+            
+            # Add only confirmation messages to chat history
             chat_history.extend([
-                {
-                    "role": "user", 
-                    "content": server_content,
-                    "display_content": display_message
-                },
-                {
-                    "role": "assistant", 
-                    "content": f"I've received the file '{filename}'. I can help you analyze or work with its content. What would you like to know about it?"
-                }
+                {"role": "user", "content": f"I've uploaded a file named {original_filename}."},
+                {"role": "assistant", "content": f"I've received the file '{original_filename}'. You can now ask me questions about its contents."}
             ])
+            
+            # Save chat histories
+            save_chat_histories()
             
             return jsonify({
                 'success': True,
                 'filename': filename,
+                'original_filename': original_filename,
                 'history': chat_history
             })
-            
-        except UnicodeDecodeError:
-            # For binary files, just acknowledge receipt
-            chat_history.extend([
-                {"role": "user", "content": f"I've uploaded a file named {filename}."},
-                {"role": "assistant", "content": f"I've received the binary file '{filename}'. What would you like me to do with it?"}
-            ])
-            
-            return jsonify({
-                'success': True,
-                'filename': filename,
-                'history': chat_history
-            })
-            
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            logger.error(f"Error processing file: {str(e)}")
+            return jsonify({'error': f'Error processing file: {str(e)}'}), 500
             
     return jsonify({'error': 'File type not allowed'}), 400
 
