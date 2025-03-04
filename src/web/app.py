@@ -23,6 +23,12 @@ log_dir = 'logs'
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, 'bunnychat.log')
 
+# Create chat history directory
+chat_history_dir = 'chat_history'
+os.makedirs(chat_history_dir, exist_ok=True)
+temp_chat_file = os.path.join(chat_history_dir, 'temp.json')
+backup_counter = 0
+
 # Create formatters and handlers
 file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)  # 10MB per file, keep 5 backups
 file_handler.setLevel(logging.DEBUG)
@@ -71,6 +77,64 @@ chat_histories = {}
 chat_clients = {}  # Store separate client instances for each chat
 chat_locks = {}
 
+def load_chat_histories():
+    """Load chat histories from disk."""
+    global chat_histories
+    try:
+        if os.path.exists(temp_chat_file):
+            with open(temp_chat_file, 'r', encoding='utf-8') as f:
+                chat_histories = {'chat-1': json.load(f)}
+        else:
+            chat_histories = {'chat-1': []}
+    except Exception as e:
+        logger.error(f"Error loading chat histories: {str(e)}")
+        chat_histories = {'chat-1': []}
+
+def save_chat_histories():
+    """Save chat histories to disk."""
+    try:
+        with open(temp_chat_file, 'w', encoding='utf-8') as f:
+            json.dump(chat_histories['chat-1'], f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error saving chat histories: {str(e)}")
+
+def backup_chat_history():
+    """Create a timestamped backup of the chat history."""
+    try:
+        # First save current state to temp file
+        save_chat_histories()
+        
+        # Then create backup
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        backup_file = os.path.join(chat_history_dir, f'chat_backup_{timestamp}.json')
+        with open(temp_chat_file, 'r', encoding='utf-8') as src:
+            with open(backup_file, 'w', encoding='utf-8') as dst:
+                dst.write(src.read())
+        logger.info(f"Created backup: {backup_file}")
+        return {'status': 'success', 'backup_file': backup_file}
+    except Exception as e:
+        logger.error(f"Error creating backup: {str(e)}")
+        return {'error': str(e)}
+
+@app.route('/api/backup', methods=['POST'])
+def create_backup():
+    """Create a backup of the current chat history."""
+    result = backup_chat_history()
+    return jsonify(result)
+
+def cleanup_temp_chat():
+    """Clean up the temporary chat file."""
+    try:
+        if os.path.exists(temp_chat_file):
+            os.remove(temp_chat_file)
+            logger.info("Cleaned up temp chat file")
+        chat_histories['chat-1'] = []
+    except Exception as e:
+        logger.error(f"Error cleaning up temp chat: {str(e)}")
+
+# Call cleanup on startup
+cleanup_temp_chat()
+
 def get_or_create_client(chat_id):
     """Get or create a client for the specific chat."""
     if chat_id not in chat_clients:
@@ -98,6 +162,19 @@ def shutdown():
     func()
     return 'Server shutting down...'
 
+@app.route('/api/quit', methods=['POST'])
+def quit():
+    """Quit the server."""
+    try:
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+        return jsonify({'status': 'success', 'message': 'Server shutting down...'})
+    except Exception as e:
+        logger.error(f"Error shutting down server: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
@@ -110,7 +187,7 @@ def chat():
             return {'error': 'Message is required'}, 400
         
         logger.info(f"Processing chat request for chat {chat_id}")
-        logger.debug(f"Message content: {message[:100]}...")  # Log first 100 chars of message
+        logger.debug(f"Message content: {message[:100]}...")
         
         # Initialize chat history if it doesn't exist
         if chat_id not in chat_histories:
@@ -131,10 +208,6 @@ def chat():
         client, lock = get_or_create_client(chat_id)
         
         def generate():
-            # Create debug directory if it doesn't exist
-            debug_dir = 'debug'
-            os.makedirs(debug_dir, exist_ok=True)
-            debug_file = os.path.join(debug_dir, f'raw_response_{chat_id}_{int(time.time())}.txt')
             logger.debug(f"Starting response stream for chat {chat_id}")
 
             # Add user message to history immediately
@@ -142,7 +215,7 @@ def chat():
             
             response_text = ""
             thinking_text = ""
-            is_thinking = True  # Start in thinking mode
+            is_thinking = True
             assistant_message = {"role": "assistant", "content": ""}
             chat_history.append(assistant_message)
             
@@ -152,15 +225,10 @@ def chat():
                         if not chunk_data:
                             continue
                         
-                        # Save raw chunk data to debug file
-                        with open(debug_file, 'a', encoding='utf-8') as f:
-                            f.write(f"=== Chunk Data ===\n{json.dumps(chunk_data, indent=2)}\n\n")
-                        
                         chunk_type = chunk_data['type']
                         chunk_content = chunk_data['content']
                         
                         if chunk_type == 'thinking':
-                            # Stream thinking text immediately
                             thinking_text += chunk_content
                             thinking = {
                                 'type': 'thinking',
@@ -170,7 +238,6 @@ def chat():
                             }
                             yield json.dumps(thinking, ensure_ascii=False) + '\n'
                         else:
-                            # If this is the first response chunk, mark end of thinking
                             if is_thinking:
                                 thinking_end = {
                                     'type': 'thinking_end',
@@ -179,9 +246,7 @@ def chat():
                                 yield json.dumps(thinking_end) + '\n'
                                 is_thinking = False
                             
-                            # Add to response text and stream
                             response_text += chunk_content
-                            # Update the assistant's message in history
                             assistant_message["content"] = response_text
                             
                             response_data = {
@@ -193,7 +258,6 @@ def chat():
                             }
                             yield json.dumps(response_data, ensure_ascii=False) + '\n'
                     
-                    # If we only got thinking text, mark its end
                     if is_thinking:
                         thinking_end = {
                             'type': 'thinking_end',
@@ -201,11 +265,12 @@ def chat():
                         }
                         yield json.dumps(thinking_end) + '\n'
                     
-                    logger.debug(f"Stream completed for chat {chat_id}")
+                    # Save chat history to temp file after message exchange is complete
+                    save_chat_histories()
+                    logger.debug(f"Stream completed for chat {chat_id} and saved to temp file")
                     
             except Exception as e:
                 logger.error(f"Error in stream for chat {chat_id}: {str(e)}", exc_info=True)
-                # Remove the incomplete assistant message on error
                 if chat_history and chat_history[-1]["role"] == "assistant":
                     chat_history.pop()
                 error_data = {
@@ -312,8 +377,28 @@ def uploaded_file(filename):
     """Serve uploaded files."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+@app.route('/api/load_history', methods=['GET'])
+def load_history():
+    """Load chat histories from disk and return them."""
+    try:
+        if os.path.exists(temp_chat_file):
+            with open(temp_chat_file, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+                # Ensure we return a dictionary with chat-1 key
+                if isinstance(history, list):
+                    history = {'chat-1': history}
+                return jsonify(history)
+        else:
+            return jsonify({'chat-1': []})
+    except Exception as e:
+        logger.error(f"Error loading chat histories: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 def main():
     """Run the web application."""
+    # Load existing chat histories
+    load_chat_histories()
+    
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='BunnyChat web interface')
     parser.add_argument('--port', type=int, default=web_settings.port,

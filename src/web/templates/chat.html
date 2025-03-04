@@ -47,105 +47,12 @@
             margin: 0;
             padding: 0;
             height: 100vh;
-            display: grid;
-            grid-template-columns: 260px 1fr;
-        }
-        
-        .sidebar {
-            border-right: 1px solid #eee;
-            background: #f8f9fa;
-            padding: 15px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            overflow-y: auto;
-        }
-        
-        .new-chat-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #eef3ff;
-            color: #1a73e8;
-            border: 1px solid #d2e3fc;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            width: 100%;
-        }
-        
-        .new-chat-btn:hover {
-            background: #d2e3fc;
-        }
-        
-        .new-chat-btn i {
-            font-size: 20px;
-        }
-        
-        .tabs-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 0;
-            border: none;
-            overflow-y: auto;
-        }
-        
-        .tab {
-            display: flex;
-            align-items: center;
-            padding: 8px 12px;
-            background: transparent;
-            border-radius: 6px;
-            cursor: pointer;
-            gap: 8px;
-            font-size: 14px;
-            color: #666;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        .tab.active {
-            background: #eef3ff;
-            color: #1a73e8;
-        }
-        
-        .tab:hover:not(.active) {
-            background: #f1f3f4;
-        }
-        
-        .tab .tab-name {
-            flex-grow: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .tab .tab-actions {
-            display: none;
-            gap: 4px;
-        }
-        
-        .tab:hover .tab-actions {
-            display: flex;
-        }
-        
-        .tab .edit-btn,
-        .tab .close-btn {
-            padding: 2px;
-            border-radius: 4px;
-            opacity: 0.7;
-            font-size: 14px;
-        }
-        
-        .tab .edit-btn:hover,
-        .tab .close-btn:hover {
-            opacity: 1;
-            background: rgba(0, 0, 0, 0.1);
         }
         
         .main-content {
+            flex-grow: 1;
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -293,6 +200,12 @@
             border-radius: 6px;
             font-size: 14px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            resize: none;
+            overflow-y: hidden;
+            min-height: 24px;
+            max-height: 200px;
+            font-family: inherit;
+            line-height: 1.4;
         }
         
         #user-input:focus {
@@ -434,15 +347,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Left sidebar -->
-        <div class="sidebar">
-            <button class="new-chat-btn" onclick="createNewChat()">
-                <i>+</i>
-                New chat
-            </button>
-            <div class="tabs-container"></div>
-        </div>
-        
         <!-- Main content -->
         <div class="main-content">
             <button class="help-button" onclick="toggleCommands()">?</button>
@@ -450,8 +354,11 @@
             <div class="commands">
                 <strong>Available commands:</strong>
                 <ul>
+                    <li><code>/help</code> - Show available commands</li>
                     <li><code>/search &lt;query&gt;</code> - Search the internet</li>
                     <li><code>/clear</code> - Clear chat history</li>
+                    <li><code>/backup</code> - Backup current chat</li>
+                    <li><code>/quit</code> - Quit the chat session</li>
                 </ul>
             </div>
             
@@ -472,7 +379,7 @@
             </div>
             
             <div class="input-container">
-                <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off">
+                <textarea id="user-input" placeholder="Type your message... (Shift+Enter for new line)" rows="1" style="resize: none; overflow-y: hidden; min-height: 24px;"></textarea>
                 <button onclick="sendMessage()">Send</button>
                 <button onclick="clearHistory()">Clear</button>
                 <button onclick="toggleFileUpload()" class="upload-button">Upload</button>
@@ -521,15 +428,127 @@
         }
         
         // Handle message sending
-        let chats = [{
-            id: 'chat-1',
-            name: 'Chat 1',
-            messages: [],  // Store actual message elements
-            history: []    // Store message data
-        }];
-        let currentChatId = 'chat-1';
+        let chats = [];  // Initialize empty, will be populated from server
+        let currentChatId = 'chat-1';  // Single chat ID
         let currentController = null;
         let activeChats = {};  // Store active chat states
+
+        // Function to save chats to storage
+        function saveChatsToStorage() {
+            // Removed - no longer saving to localStorage
+        }
+
+        // Add backup command handler
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const message = this.value.trim();
+                
+                if (message === '/help') {
+                    appendMessage('user', '/help');
+                    appendMessage('assistant', `Available commands:
+- /help - Show available commands
+- /search <query> - Search the internet
+- /clear - Clear chat history
+- /backup - Backup current chat
+- /quit - Quit the chat session`);
+                    this.value = '';
+                    return;
+                }
+                
+                if (message === '/backup') {
+                    createBackup();
+                    this.value = '';
+                    return;
+                }
+                
+                if (message === '/clear') {
+                    clearHistory();
+                    this.value = '';
+                    return;
+                }
+                
+                if (message === '/quit') {
+                    appendMessage('user', '/quit');
+                    appendMessage('assistant', 'Shutting down the server...');
+                    fetch('/api/quit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }).then(() => {
+                        window.close();
+                    }).catch(error => {
+                        console.error('Error shutting down:', error);
+                        appendMessage('assistant', 'Error shutting down the server. Please use Ctrl+C in the terminal.');
+                    });
+                    this.value = '';
+                    return;
+                }
+                
+                sendMessage();
+            }
+        });
+
+        async function createBackup() {
+            try {
+                const response = await fetch('/api/backup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                if (result.error) {
+                    appendMessage('assistant', `Error creating backup: ${result.error}`);
+                } else {
+                    appendMessage('assistant', `Backup created successfully: ${result.backup_file}`);
+                }
+            } catch (error) {
+                console.error('Error creating backup:', error);
+                appendMessage('assistant', `Error creating backup: ${error.message}`);
+            }
+        }
+
+        // Initialize chat from stored history
+        async function initializeChat() {
+            try {
+                // Load chat history from server
+                const response = await fetch('/api/load_history');
+                const serverHistory = await response.json();
+                
+                // Initialize single chat
+                chats = [{
+                    id: 'chat-1',
+                    name: 'Chat',
+                    messages: [],
+                    history: serverHistory['chat-1'] || []
+                }];
+                
+                // Restore chat history
+                const chatContainer = document.getElementById('chat-container');
+                chatContainer.innerHTML = '';
+                
+                if (chats[0].history.length > 0) {
+                    chats[0].history.forEach(msg => {
+                        appendMessage(msg.role, msg.content);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+                appendMessage('assistant', 'Error loading chat history. Starting fresh chat.');
+                chats = [{
+                    id: 'chat-1',
+                    name: 'Chat',
+                    messages: [],
+                    history: []
+                }];
+            }
+        }
+
+        // Initialize on page load
+        initializeChat();
         
         async function sendMessage() {
             const input = document.getElementById('user-input');
@@ -538,6 +557,7 @@
             
             input.value = '';
             input.disabled = true;
+            input.style.height = 'auto';  // Reset height after sending
             
             // Get current chat
             const currentChat = chats.find(chat => chat.id === currentChatId);
@@ -561,7 +581,7 @@
                     role: 'user',
                     content: message
                 });
-                
+
                 // Create message container for assistant's response
                 messageDiv = document.createElement('div');
                 messageDiv.className = 'message assistant-message';
@@ -747,8 +767,12 @@
             
             // If content is an object with display_content, use that for display
             const displayContent = (typeof content === 'object' && content.display_content) ? content.display_content : content;
-            const contentText = document.createTextNode(' ' + displayContent);
-            messageRow.appendChild(contentText);
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.style.display = 'inline';
+            contentDiv.style.whiteSpace = 'pre-wrap';
+            contentDiv.textContent = ' ' + displayContent;
+            messageRow.appendChild(contentDiv);
             
             messageDiv.appendChild(messageRow);
             chatContainer.appendChild(messageDiv);
@@ -769,17 +793,17 @@
                     body: JSON.stringify({ chatId: currentChatId })
                 });
                 document.getElementById('chat-container').innerHTML = '';
+                
+                // Clear history in memory and storage
+                const currentChat = chats.find(chat => chat.id === currentChatId);
+                if (currentChat) {
+                    currentChat.history = [];
+                    saveChatsToStorage();
+                }
             } catch (error) {
                 console.error('Error clearing history:', error);
             }
         }
-        
-        // Handle Enter key
-        document.getElementById('user-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
         
         // File upload handling
         const fileUploadArea = document.getElementById('file-upload');
@@ -925,9 +949,8 @@
             }
         }
         
-        // Add chat management
         function createNewChat() {
-            const chatId = `chat-${chats.length + 1}`;
+            const chatId = `chat-${Date.now()}`;  // Use timestamp for unique ID
             const chatName = `Chat ${chats.length + 1}`;
             
             chats.push({
@@ -939,6 +962,7 @@
             
             addTabToUI(chatId, chatName);
             switchChat(chatId);
+            saveChatsToStorage();
         }
         
         function addTabToUI(chatId, chatName) {
@@ -1004,9 +1028,11 @@
             }
         }
         
-        // Initialize first tab
-        addTabToUI('chat-1', 'Chat 1');
-        switchChat('chat-1');
+        // Add auto-resize functionality for textarea
+        document.getElementById('user-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
     </script>
 </body>
 </html> 
