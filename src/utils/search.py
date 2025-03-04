@@ -6,7 +6,11 @@ import sys
 import subprocess
 from typing import List, Dict
 import json
+import logging
 from ..config.settings import search_settings
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 def search_web(query: str) -> List[Dict[str, str]]:
     """Search the web using the search engine tool.
@@ -47,7 +51,7 @@ def search_web(query: str) -> List[Dict[str, str]]:
         return results[:search_settings.max_results]
         
     except subprocess.CalledProcessError as e:
-        print(f"Error searching web: {e.stderr}", file=sys.stderr)
+        logger.error(f"Search engine error: {e.stderr}")
         return []
 
 def scrape_urls(urls: List[str]) -> List[Dict[str, str]]:
@@ -75,11 +79,11 @@ def scrape_urls(urls: List[str]) -> List[Dict[str, str]]:
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError:
-            print("Error parsing scraper output", file=sys.stderr)
+            logger.error("Failed to parse web scraper output")
             return []
             
     except subprocess.CalledProcessError as e:
-        print(f"Error scraping URLs: {e.stderr}", file=sys.stderr)
+        logger.error(f"Web scraper error: {e.stderr}")
         return []
 
 def search_and_scrape(query: str) -> str:

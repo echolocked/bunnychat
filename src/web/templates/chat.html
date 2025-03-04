@@ -383,7 +383,7 @@
             <!-- Thinking process template -->
             <template id="thinking-template">
                 <div class="message assistant-message">
-                    <strong>Assistant:</strong>
+                    <strong>Bunny:</strong>
                     <div class="thinking">
                         Generating response<span>.</span><span>.</span><span>.</span>
                     </div>
@@ -501,7 +501,7 @@
                 messageRow.className = 'message-row';
                 
                 const roleLabel = document.createElement('strong');
-                roleLabel.textContent = 'Assistant:';
+                roleLabel.textContent = 'Bunny:';
                 messageRow.appendChild(roleLabel);
                 
                 const contentDiv = document.createElement('div');
@@ -547,43 +547,87 @@
                     
                     const lines = chunk.split('\n').filter(line => line.trim());
                     for (const line of lines) {
-                        const data = JSON.parse(line);
-                        
-                        // Check if this response is for the current chat
-                        if (data.chatId !== currentChatId) {
-                            console.debug(`Skipping response for chat ${data.chatId}`);
-                            continue;
-                        }
-                        
-                        if (data.error) {
-                            throw new Error(data.error);
-                        }
-                        
-                        // Handle thinking process
-                        if (data.type === 'thinking') {
-                            // Update existing thinking div
-                            const thinkingDiv = messageDiv.querySelector('.thinking-process');
-                            if (thinkingDiv) {
-                                thinkingDiv.textContent = data.full_thinking;
+                        try {
+                            // Log raw line for debugging
+                            console.debug('Processing line:', line);
+                            
+                            const data = JSON.parse(line);
+                            
+                            // Check if this response is for the current chat
+                            if (data.chatId !== currentChatId) {
+                                console.debug(`Skipping response for chat ${data.chatId}`);
+                                continue;
                             }
-                            continue;
-                        }
-                        
-                        // Handle thinking end
-                        if (data.type === 'thinking_end') {
-                            const thinkingDiv = messageDiv.querySelector('.thinking-process');
-                            if (thinkingDiv) {
-                                thinkingDiv.style.borderBottom = '1px solid #eee';
-                                thinkingDiv.style.marginBottom = '12px';
+                            
+                            if (data.error) {
+                                throw new Error(data.error);
                             }
-                            continue;
-                        }
-                        
-                        // Handle response chunks
-                        if (data.chunk && contentSpan) {
-                            contentSpan.textContent = data.response; // Use full response instead of just chunk
-                            activeChats[currentChatId].responseText = data.response;
-                            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+                            
+                            // Handle thinking process
+                            if (data.type === 'thinking') {
+                                // Update existing thinking div
+                                const thinkingDiv = messageDiv.querySelector('.thinking-process');
+                                if (thinkingDiv) {
+                                    thinkingDiv.textContent = data.full_thinking;
+                                }
+                                continue;
+                            }
+                            
+                            // Handle thinking end
+                            if (data.type === 'thinking_end') {
+                                const thinkingDiv = messageDiv.querySelector('.thinking-process');
+                                if (thinkingDiv) {
+                                    thinkingDiv.style.borderBottom = '1px solid #eee';
+                                    thinkingDiv.style.marginBottom = '12px';
+                                }
+                                continue;
+                            }
+                            
+                            // Handle response chunks
+                            if (data.chunk && contentSpan) {
+                                // Accumulate response text
+                                let displayText = data.chunk;  // Use the chunk instead of complete response
+                                activeChats[currentChatId].responseText += displayText;
+                                
+                                // Format the accumulated text
+                                let formattedText = activeChats[currentChatId].responseText
+                                    .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                                    .replace(/\\\\/g, '\\')  // Convert escaped backslashes
+                                    .replace(/\\"/g, '"');   // Convert escaped quotes
+                                
+                                // Convert markdown-style formatting
+                                formattedText = formattedText
+                                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')  // Bold text
+                                    .replace(/\n---\n/g, '<hr>')  // Horizontal rules
+                                    .replace(/\n\n/g, '<br><br>');  // Paragraph breaks
+                                
+                                // Update display
+                                contentSpan.innerHTML = formattedText;
+                                
+                                // Scroll to bottom
+                                const chatContainer = document.getElementById('chat-container');
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                                
+                                // Log for debugging
+                                console.debug(`Updated response, accumulated length: ${activeChats[currentChatId].responseText.length}`);
+                            }
+                        } catch (error) {
+                            console.error('JSON Parse Error Details:', {
+                                error: error.message,
+                                position: error.message.match(/position (\d+)/)?.[1],
+                                problematicLine: line,
+                                excerpt: line.substring(
+                                    Math.max(0, parseInt(error.message.match(/position (\d+)/)?.[1] || '0') - 20),
+                                    Math.min(line.length, parseInt(error.message.match(/position (\d+)/)?.[1] || '0') + 20)
+                                ),
+                                lineLength: line.length
+                            });
+                            
+                            // Show error in chat but continue processing
+                            if (contentSpan) {
+                                contentSpan.innerHTML += `<br><em>Error processing response. Continuing...</em>`;
+                            }
+                            continue;  // Continue to next chunk
                         }
                     }
                 }
@@ -610,10 +654,12 @@
             messageRow.className = 'message-row';
             
             const roleLabel = document.createElement('strong');
-            roleLabel.textContent = `${role === 'user' ? 'You' : 'Assistant'}:`;
+            roleLabel.textContent = `${role === 'user' ? 'You' : 'Bunny'}:`;
             messageRow.appendChild(roleLabel);
             
-            const contentText = document.createTextNode(' ' + content);
+            // If content is an object with display_content, use that for display
+            const displayContent = (typeof content === 'object' && content.display_content) ? content.display_content : content;
+            const contentText = document.createTextNode(' ' + displayContent);
             messageRow.appendChild(contentText);
             
             messageDiv.appendChild(messageRow);

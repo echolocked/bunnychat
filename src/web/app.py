@@ -14,7 +14,35 @@ from src.utils.helpers import create_chat_messages
 from src.utils.search import search_and_scrape
 from threading import Lock
 import logging
+from logging.handlers import RotatingFileHandler
 import argparse
+import time
+
+# Set up logging
+log_dir = 'logs'
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'bunnychat.log')
+
+# Create formatters and handlers
+file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)  # 10MB per file, keep 5 backups
+file_handler.setLevel(logging.DEBUG)
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+console_handler.setFormatter(console_formatter)
+
+# Configure root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
+logger.info(f"Starting BunnyChat server, logging to {log_file}")
 
 app = Flask(__name__)
 # Set Flask's logger to INFO level
@@ -46,14 +74,14 @@ chat_locks = {}
 def get_or_create_client(chat_id):
     """Get or create a client for the specific chat."""
     if chat_id not in chat_clients:
-        app.logger.debug(f"Creating new client for chat {chat_id}")
+        logger.debug(f"Creating new client for chat {chat_id}")
         chat_clients[chat_id] = DeepSeekClient()
         chat_locks[chat_id] = Lock()
     return chat_clients[chat_id], chat_locks[chat_id]
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
-    print("\nShutting down the server...")
+    logger.info("Shutting down the server...")
     sys.exit(0)
 
 @app.route('/')
@@ -78,13 +106,16 @@ def chat():
         chat_id = data.get('chatId', 'default')
         
         if not message:
+            logger.warning("Received chat request without message")
             return {'error': 'Message is required'}, 400
         
-        app.logger.info(f"Processing chat request for chat {chat_id}")
+        logger.info(f"Processing chat request for chat {chat_id}")
+        logger.debug(f"Message content: {message[:100]}...")  # Log first 100 chars of message
         
         # Initialize chat history if it doesn't exist
         if chat_id not in chat_histories:
             chat_histories[chat_id] = []
+            logger.debug(f"Initialized new chat history for {chat_id}")
         
         # Get chat history
         chat_history = chat_histories[chat_id]
@@ -95,10 +126,17 @@ def chat():
             system_message=chat_settings.system_message,
             chat_history=chat_history
         )
+        logger.debug(f"Created messages with {len(messages)} entries")
         
         client, lock = get_or_create_client(chat_id)
         
         def generate():
+            # Create debug directory if it doesn't exist
+            debug_dir = 'debug'
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_file = os.path.join(debug_dir, f'raw_response_{chat_id}_{int(time.time())}.txt')
+            logger.debug(f"Starting response stream for chat {chat_id}")
+
             # Add user message to history immediately
             chat_history.append({"role": "user", "content": message})
             
@@ -110,12 +148,13 @@ def chat():
             
             try:
                 with lock:
-                    app.logger.debug(f"Starting response stream for chat {chat_id}")
-                    
-                    # Use chat directly with messages instead of chat_stream
                     for chunk_data in client.chat(messages=messages, stream=True):
                         if not chunk_data:
                             continue
+                        
+                        # Save raw chunk data to debug file
+                        with open(debug_file, 'a', encoding='utf-8') as f:
+                            f.write(f"=== Chunk Data ===\n{json.dumps(chunk_data, indent=2)}\n\n")
                         
                         chunk_type = chunk_data['type']
                         chunk_content = chunk_data['content']
@@ -129,7 +168,7 @@ def chat():
                                 'full_thinking': thinking_text,
                                 'chatId': chat_id
                             }
-                            yield json.dumps(thinking) + '\n'
+                            yield json.dumps(thinking, ensure_ascii=False) + '\n'
                         else:
                             # If this is the first response chunk, mark end of thinking
                             if is_thinking:
@@ -149,9 +188,10 @@ def chat():
                                 'type': 'response',
                                 'chunk': chunk_content,
                                 'response': response_text,
-                                'chatId': chat_id
+                                'chatId': chat_id,
+                                'format': 'markdown'
                             }
-                            yield json.dumps(response_data) + '\n'
+                            yield json.dumps(response_data, ensure_ascii=False) + '\n'
                     
                     # If we only got thinking text, mark its end
                     if is_thinking:
@@ -161,10 +201,10 @@ def chat():
                         }
                         yield json.dumps(thinking_end) + '\n'
                     
-                    app.logger.debug(f"Stream completed for chat {chat_id}")
+                    logger.debug(f"Stream completed for chat {chat_id}")
                     
             except Exception as e:
-                app.logger.error(f"Error in stream for chat {chat_id}: {str(e)}")
+                logger.error(f"Error in stream for chat {chat_id}: {str(e)}", exc_info=True)
                 # Remove the incomplete assistant message on error
                 if chat_history and chat_history[-1]["role"] == "assistant":
                     chat_history.pop()
@@ -173,8 +213,6 @@ def chat():
                     'chatId': chat_id
                 }
                 yield json.dumps(error_data) + '\n'
-            finally:
-                app.logger.debug(f"Stream cleanup for chat {chat_id}")
         
         return Response(
             stream_with_context(generate()),
@@ -182,7 +220,7 @@ def chat():
         )
         
     except Exception as e:
-        app.logger.error(f"Error processing request: {str(e)}")
+        logger.error(f"Error processing request: {str(e)}", exc_info=True)
         return {'error': str(e)}, 500
 
 @app.route('/api/clear', methods=['POST'])
@@ -229,10 +267,20 @@ def upload_file():
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Add file content to chat history
+            # Only show upload notification in chat, but send full content to server
+            display_message = f"I've uploaded a file named {filename}."
+            server_content = f"I've uploaded a file named {filename}.\n\nFile content:\n\n{content}"
+            
             chat_history.extend([
-                {"role": "user", "content": f"I've uploaded a file named {filename}. Here's its content:\n\n```\n{content}\n```"},
-                {"role": "assistant", "content": f"I've received the file '{filename}'. I can help you analyze or work with its content. What would you like to know about it?"}
+                {
+                    "role": "user", 
+                    "content": server_content,
+                    "display_content": display_message
+                },
+                {
+                    "role": "assistant", 
+                    "content": f"I've received the file '{filename}'. I can help you analyze or work with its content. What would you like to know about it?"
+                }
             ])
             
             return jsonify({

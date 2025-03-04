@@ -5,6 +5,7 @@ Command-line interface for the DeepSeek chatbot.
 import os
 import json
 import sys
+import logging
 from typing import List, Dict
 import readline  # For better input handling (command history)
 
@@ -12,6 +13,9 @@ from src.config.settings import chat_settings, api_settings
 from src.utils.helpers import create_chat_messages
 from src.utils.search import search_and_scrape
 from src.chat.client import DeepSeekClient
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 class ChatCLI:
     def __init__(self, history_file: str = "chat_history.json"):
@@ -34,7 +38,7 @@ class ChatCLI:
                 with open(self.history_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                print(f"Error loading chat history: {e}", file=sys.stderr)
+                logger.error(f"Failed to load chat history: {e}")
                 return []
         return []
     
@@ -44,7 +48,7 @@ class ChatCLI:
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(self.chat_history, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"Error saving chat history: {e}", file=sys.stderr)
+            logger.error(f"Failed to save chat history: {e}")
     
     def print_streaming_response(self, response_iterator):
         """Print streaming response with proper formatting."""
@@ -58,17 +62,27 @@ class ChatCLI:
     
     def handle_search(self, query: str) -> str:
         """Handle search command and return results."""
-        print("\nSearching the web...", flush=True)
-        return search_and_scrape(query)
+        try:
+            results = search_and_scrape(query)
+            if not results:
+                return "No search results found."
+            
+            # Format results
+            formatted_results = []
+            for result in results:
+                formatted_results.append(f"URL: {result['url']}")
+                formatted_results.append(f"Title: {result['title']}")
+                formatted_results.append(f"Content: {result['content'][:200]}...")
+                formatted_results.append("")
+            
+            return "\n".join(formatted_results)
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            return f"Error performing search: {str(e)}"
     
     def run(self):
-        """Run the chat interface."""
-        print(f"Welcome to DeepSeek Chat! Using model: {chat_settings.model}")
-        print("Commands:")
-        print("  /search <query> - Search the internet")
-        print("  /clear - Clear chat history")
-        print("  /quit or /exit - End chat")
-        print("Streaming responses enabled - you'll see the response as it's generated.")
+        """Run the chat CLI."""
+        print("Welcome to DeepSeek Chat! Type '/help' for commands, '/quit' to exit.")
         
         while True:
             try:
@@ -76,36 +90,32 @@ class ChatCLI:
                 user_input = input("\nYou: ").strip()
                 
                 # Handle commands
-                if user_input.lower() in ['/quit', '/exit', 'quit', 'exit']:
+                if user_input.lower() in ['/quit', '/exit']:
                     print("Goodbye!")
-                    self.save_history()
                     break
-                elif user_input.lower() in ['/clear', 'clear']:
+                elif user_input.lower() == '/help':
+                    print("\nCommands:")
+                    print("  /help  - Show this help message")
+                    print("  /clear - Clear chat history")
+                    print("  /quit  - Exit the chat")
+                    print("  /search <query> - Search the web")
+                    continue
+                elif user_input.lower() == '/clear':
                     self.chat_history = []
                     self.save_history()
                     print("Chat history cleared.")
                     continue
+                elif user_input.lower().startswith('/search '):
+                    query = user_input[8:].strip()
+                    if query:
+                        print("\nSearching...")
+                        results = self.handle_search(query)
+                        print(results)
+                    continue
                 elif not user_input:
                     continue
-                elif user_input.lower().startswith('/search '):
-                    search_query = user_input[8:].strip()
-                    if search_query:
-                        search_results = self.handle_search(search_query)
-                        print(search_results)
-                        
-                        # Add search results to chat history
-                        self.chat_history.append({
-                            "role": "user",
-                            "content": f"Please search for information about: {search_query}"
-                        })
-                        self.chat_history.append({
-                            "role": "assistant",
-                            "content": f"Here are the search results:\n\n{search_results}"
-                        })
-                        self.save_history()
-                    continue
                 
-                # Create messages with history
+                # Create messages with history and system message
                 messages = create_chat_messages(
                     user_message=user_input,
                     system_message=chat_settings.system_message,
@@ -113,15 +123,9 @@ class ChatCLI:
                 )
                 
                 # Get streaming response
-                response_iterator = self.client.chat(
-                    messages=messages,
-                    stream=True,  # Always use streaming
-                    temperature=chat_settings.temperature,
-                    max_tokens=chat_settings.max_tokens
+                response_text = self.print_streaming_response(
+                    self.client.chat(messages=messages, stream=True)
                 )
-                
-                # Print response and get complete text
-                response_text = self.print_streaming_response(response_iterator)
                 
                 # Update history
                 self.chat_history.append({"role": "user", "content": user_input})
@@ -131,7 +135,8 @@ class ChatCLI:
             except KeyboardInterrupt:
                 print("\nInterrupted. Type '/quit' or '/exit' to end the chat.")
             except Exception as e:
-                print(f"\nError: {str(e)}", file=sys.stderr)
+                logger.error(f"Chat error: {e}")
+                print("\nAn error occurred. Please try again.")
 
 def main():
     """Main entry point for the CLI."""

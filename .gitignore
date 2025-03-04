@@ -33,10 +33,29 @@ ENV/
 # Project specific
 chat_history.json
 .env
+logs/
+debug/
+uploads/
+
+# Log files
+*.log
+*.log.*
+*.debug
+
+# Debug files
+raw_response_*.txt
+debug_*.txt
 
 # Misc
 .DS_Store
 .env.local
 .env.development.local
 .env.test.local
-.env.production.local 
+.env.production.local
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover 
