@@ -66,6 +66,13 @@ Then open http://localhost:5000 in your browser. The web interface provides:
 - Syntax highlighting for code blocks
 - Modern, responsive design
 
+Available commands:
+- `/help` - Show available commands
+- `/search <query>` - Search the internet
+- `/clear` - Clear chat history
+- `/backup` - Create a backup of current chat
+- `/quit` - Shutdown the server
+
 ## Development
 
 The project structure:
