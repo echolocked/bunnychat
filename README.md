@@ -1,6 +1,6 @@
 # BunnyChat
 
-A chatbot using DeepSeek's API, with support for web search and streaming responses. Features both command-line and web interfaces.
+A chatbot localizing DeepSeek, with support for web search and streaming responses. Features both command-line and web interfaces.
 
 ## Features
 
@@ -93,7 +93,3 @@ bunnychat/
 ├── tools/              # External tools
 └── requirements.txt    # Project dependencies
 ```
-
-## License
-
-MIT
